@@ -112,6 +112,11 @@ int main(){
 	auto transform = map->GetRecommendedSpawnPoints()[1];
 	auto ego_actor = world.SpawnActor((*vehicles)[12], transform);
 
+  // Parameters
+  // TODO: Adjust it.
+  
+   	double leafSize = 1.0;
+
 	//Create lidar
 	auto lidar_bp = *(blueprint_library->Find("sensor.lidar.ray_cast"));
 	// CANDO: Can modify lidar values to get different scan resolutions
@@ -201,7 +206,11 @@ int main(){
 			
 			new_scan = true;
 			// TODO: (Filter scan using voxel filter)
-
+          	pcl::VoxelGrid<PointT> vg;
+          	vg.setInputCloud(scanCloud);
+          	vg.setLeafSize(leafSize, leafSize, leafSize);
+          	vg.filter(*cloudFiltered);
+          
 			// TODO: Find pose transform by using ICP or NDT matching
 			//pose = ....
 
