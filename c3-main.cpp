@@ -99,6 +99,38 @@ void drawCar(Pose pose, int num, Color color, double alpha, pcl::visualization::
 	renderBox(viewer, box, num, color, alpha);
 }
 
+Eigen::Matrix4d ICP(PointCloudT::Ptr target, PointCloudT::Ptr source, Pose startingPose, int iterations){
+ 
+	Eigen::Matrix4d transformation_matrix = Eigen::Matrix4d::Identity();
+
+	Eigen::Matrix4d initTransform = transform3D(startingPose.rotation.yaw, startingPose.rotation.pitch, startingPose.rotation.roll, startingPose.position.x, startingPose.position.y, startingPose.position.z);
+  	PointCloudT::Ptr transformSource (new PointCloudT);
+  	pcl::transformPointCloud(*source, *transformSource, initTransform);
+  
+
+	pcl::console::TicToc time;
+  	time.tic ();
+  	pcl::IterativeClosestPoint<PointT, PointT> icp;
+
+
+  	icp.setMaximumIterations(iterations);
+  	icp.setInputSource(transformSource);
+  	icp.setInputTarget(target);
+  	icp.setMaxCorrespondenceDistance(2);
+  
+  	PointCloudT::Ptr tempSource (new PointCloudT);
+  	icp.align(*tempSource);
+  
+  	if(icp.hasConverged()){
+		transformation_matrix = icp.getFinalTransformation().cast<double>();
+		transformation_matrix = transformation_matrix * initTransform;
+		return transformation_matrix;
+    }
+  	std::cout << "WARNING: ICP did not converge" << std::endl;
+
+	return transformation_matrix;
+}
+
 // Normal distribution transform calculates scan matching between measued point cloud and map and returns transformation matrix.
 Eigen::Matrix4d NDT (pcl::NormalDistributionsTransform<pcl::PointXYZ, pcl::PointXYZ> ndt, PointCloudT::Ptr source, Pose startingPose, int iterations) {
   Eigen::Matrix4f init_guess = transform3D(startingPose.rotation.yaw, startingPose.rotation.pitch, startingPose.rotation.roll, startingPose.position.x, startingPose.position.y, startingPose.position.z).cast<float>();
@@ -234,12 +266,16 @@ int main(){
           
 			// TODO: Find pose transform by using ICP or NDT matching
 			// Scan matching using NDT.
-        	 Eigen::Matrix4d transform_ndt = NDT(ndt, cloudFiltered, pose, iters);
-             pose = getPose(transform_ndt);
+        	// Eigen::Matrix4d transform_trans = NDT(ndt, cloudFiltered, pose, iters);
+            // pose = getPose(transform_trans);
+
+            // IPC.
+             Eigen::Matrix4d transform_trans = ICP(mapCloud, cloudFiltered, pose, iters);
+             pose = getPose(transform_trans);
 
 			// TODO: Transform scan so it aligns with ego's actual pose and render that scan
           	PointCloudT::Ptr transformed_scan (new PointCloudT);
-          	pcl::transformPointCloud(*cloudFiltered, *transformed_scan, transform_ndt);
+          	pcl::transformPointCloud(*cloudFiltered, *transformed_scan, transform_trans);
 
 			viewer->removePointCloud("scan");
 
